@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+rates.json
+hooks_mac.zip
+uv.lock
+*.tmp
+.claude/
+.idea/
