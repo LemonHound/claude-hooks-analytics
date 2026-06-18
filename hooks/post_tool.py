@@ -6,6 +6,8 @@ from urllib.parse import urlparse, urlsplit, urlunsplit
 sys.path.insert(0, str(Path(__file__).parent))
 from _common import append_event, read_stdin_json, now_iso, SCHEMA_VERSION
 from _config import DENIAL_SIGNATURES
+from _segments import classify_bash, classify_powershell
+from _testparse import parse_test_output
 from _text import normalize_text
 
 
@@ -193,6 +195,13 @@ def build_event(
         text = _concat_content_text(raw_content)
         toolsearch_tools_loaded = _extract_loaded_tool_names(text)
 
+    test_info = None
+    if tool_name in ("Bash", "PowerShell") and isinstance(tool_input, dict):
+        cmd = tool_input.get("command") or ""
+        cats = classify_bash(cmd) if tool_name == "Bash" else classify_powershell(cmd)
+        if "test" in cats:
+            test_info = parse_test_output(normalize_text(_concat_content_text(raw_content)), is_error)
+
     event = {
         "phase": "post_tool",
         "session_id": session_id,
@@ -215,6 +224,7 @@ def build_event(
         "query_truncated": query_truncated,
         "result_count": result_count,
         "toolsearch_tools_loaded": toolsearch_tools_loaded,
+        "test": test_info,
     }
 
     red_flag = None

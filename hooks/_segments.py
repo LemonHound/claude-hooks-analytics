@@ -8,6 +8,15 @@ from _text import normalize_command
 Shell = Literal["bash", "powershell"]
 
 
+def parse_mcp_tool(tool_name):
+    if not isinstance(tool_name, str) or not tool_name.startswith("mcp__"):
+        return None, None
+    parts = tool_name.split("__")
+    if len(parts) < 3:
+        return (parts[1] if len(parts) > 1 else None), None
+    return parts[1], "__".join(parts[2:])
+
+
 _BASH_CATEGORY_PATTERNS = [
     ("git", re.compile(r"^\s*(git|gh)\b")),
     ("test", re.compile(r"\b(pytest|jest|vitest|mocha|go\s+test|cargo\s+test|npm\s+test|yarn\s+test|pnpm\s+test|rspec|tox|nox|unittest)\b")),

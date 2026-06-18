@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 def resolve_runs_dir(env=None, config_path=None):
     env = env if env is not None else os.environ

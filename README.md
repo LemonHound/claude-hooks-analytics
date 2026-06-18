@@ -32,7 +32,9 @@ Per session and per subagent: tool-call counts and mix, token usage and cache
 efficiency (read from the transcript), agents dispatched, skills invoked, files read
 and written, bash command classification and file-mutation targets, permission
 denials, conflict-marker red flags, wall-clock vs. active time, and inferred ship
-outcome (commit / push / PR / merge).
+outcome (commit / push / PR / merge). With the optional hooks enabled, it also
+captures context compaction events, notifications (permission prompts vs. idle),
+code churn (lines added/removed), test pass/fail outcomes, and MCP usage by server.
 
 ## Read your data
 
