@@ -225,6 +225,25 @@ def build_payload(sessions, artifacts):
     dated = [s["timestamp_start"][:10] for s in sessions if s.get("timestamp_start")]
     days_range = {"start": min(dated), "end": max(dated)} if dated else None
 
+    churn = {
+        "added": sum(s.get("lines_added") or 0 for s in sessions),
+        "removed": sum(s.get("lines_removed") or 0 for s in sessions),
+    }
+    churn["net"] = churn["added"] - churn["removed"]
+    tests = {
+        "runs": sum(s.get("test_run_count") or 0 for s in sessions),
+        "passed": sum(s.get("test_pass_total") or 0 for s in sessions),
+        "failed": sum(s.get("test_fail_total") or 0 for s in sessions),
+        "failed_runs": sum(s.get("test_failed_runs") or 0 for s in sessions),
+    }
+    mcp_totals: dict[str, int] = {}
+    for s in sessions:
+        for srv, n in (s.get("mcp_server_breakdown") or {}).items():
+            mcp_totals[srv] = mcp_totals.get(srv, 0) + (n or 0)
+    compaction_total = sum(s.get("compaction_count") or 0 for s in sessions)
+    notification_total = sum(s.get("notification_count") or 0 for s in sessions)
+    permission_request_total = sum(s.get("permission_request_count") or 0 for s in sessions)
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "session_count": len(sessions),
@@ -241,6 +260,12 @@ def build_payload(sessions, artifacts):
         "sessions": session_list,
         "total_prompts": total_prompts,
         "correction_prompts": correction_prompts,
+        "churn": churn,
+        "tests": tests,
+        "mcp_totals": mcp_totals,
+        "compaction_total": compaction_total,
+        "notification_total": notification_total,
+        "permission_request_total": permission_request_total,
     }
 
 
@@ -352,6 +377,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <button onclick="showPage('agents')">Agents</button>
     <button onclick="showPage('sessions')">Sessions</button>
     <button onclick="showPage('efficiency')">Efficiency</button>
+    <button onclick="showPage('activity')">Activity</button>
   </nav>
   <div class="meta" id="meta"></div>
 </header>
@@ -460,6 +486,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="card">
         <div class="card-header"><h2>Correction-Like Prompts</h2></div>
         <div id="correction-detail"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY -->
+  <div id="page-activity" class="page">
+    <div class="grid grid-4" style="margin-bottom:16px" id="activity-kpis"></div>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-header"><h2>MCP Usage</h2><span class="card-sub">tool calls by server</span></div>
+        <div id="mcp-bars"></div>
       </div>
     </div>
   </div>
@@ -684,6 +721,21 @@ function renderBars(containerId, data, color) {
       </div>
     </div>
   `).join('');
+}
+
+function renderActivity() {
+  const c = DATA.churn || {added:0, removed:0, net:0};
+  const t = DATA.tests || {runs:0, passed:0, failed:0, failed_runs:0};
+  const el = document.getElementById('activity-kpis');
+  if (el) {
+    el.innerHTML = `
+      <div class="card stat"><span class="label">Code Churn</span><span class="value">${fmt(c.net)}</span><span class="sub">${fmt(c.added)} added / ${fmt(c.removed)} removed</span></div>
+      <div class="card stat"><span class="label">Test Runs</span><span class="value">${t.runs}</span><span class="sub">${t.failed_runs} failed runs &bull; ${fmt(t.passed)}/${fmt(t.failed)} pass/fail</span></div>
+      <div class="card stat"><span class="label">Compactions</span><span class="value">${DATA.compaction_total||0}</span><span class="sub">context compaction events</span></div>
+      <div class="card stat"><span class="label">Permission Prompts</span><span class="value">${DATA.permission_request_total||0}</span><span class="sub">of ${DATA.notification_total||0} notifications</span></div>
+    `;
+  }
+  renderBars('mcp-bars', DATA.mcp_totals || {}, 'var(--accent2)');
 }
 
 function renderModelTable() {
@@ -976,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderEfficiencyKPIs();
   renderRepeatReads();
   renderCorrectionDetail();
+  renderActivity();
 
   pageRendered['overview'] = true;
   renderPageCharts('overview');
