@@ -373,6 +373,57 @@ def report(sessions: list[dict], artifacts: list[dict]) -> None:
         print(f"  Total tool errors:    {total_errors}")
         print()
 
+    churn_added = sum(s.get("lines_added") or 0 for s in sessions)
+    churn_removed = sum(s.get("lines_removed") or 0 for s in sessions)
+    if churn_added or churn_removed:
+        print("CODE CHURN")
+        print(_hr())
+        print(f"  Lines added:   {_fmt_int(churn_added)}")
+        print(f"  Lines removed: {_fmt_int(churn_removed)}")
+        print(f"  Net lines:     {_fmt_int(churn_added - churn_removed)}")
+        print()
+
+    test_runs = sum(s.get("test_run_count") or 0 for s in sessions)
+    if test_runs:
+        test_pass = sum(s.get("test_pass_total") or 0 for s in sessions)
+        test_fail = sum(s.get("test_fail_total") or 0 for s in sessions)
+        failed_runs = sum(s.get("test_failed_runs") or 0 for s in sessions)
+        print("TEST RUNS")
+        print(_hr())
+        print(f"  Test commands run:  {test_runs}")
+        print(f"  Failed runs:        {failed_runs}")
+        print(f"  Assertions passed:  {_fmt_int(test_pass)}")
+        print(f"  Assertions failed:  {_fmt_int(test_fail)}")
+        print()
+
+    mcp_totals: dict[str, int] = {}
+    for s in sessions:
+        for srv, n in (s.get("mcp_server_breakdown") or {}).items():
+            mcp_totals[srv] = mcp_totals.get(srv, 0) + (n or 0)
+    if mcp_totals:
+        print("MCP USAGE (by server)")
+        print(_hr())
+        for srv, n in sorted(mcp_totals.items(), key=lambda x: -x[1]):
+            print(f"  {srv:30s} {n}")
+        print()
+
+    compactions = sum(s.get("compaction_count") or 0 for s in sessions)
+    if compactions:
+        sessions_compacted = sum(1 for s in sessions if s.get("compaction_count"))
+        print("CONTEXT COMPACTION")
+        print(_hr())
+        print(f"  Compactions: {compactions} across {sessions_compacted} sessions")
+        print()
+
+    notif_total = sum(s.get("notification_count") or 0 for s in sessions)
+    if notif_total:
+        notif_perm = sum(s.get("permission_request_count") or 0 for s in sessions)
+        print("NOTIFICATIONS")
+        print(_hr())
+        print(f"  Total:               {notif_total}")
+        print(f"  Permission requests: {notif_perm}")
+        print()
+
     print("TIMING")
     print(_hr())
     walls = [s["wall_clock_seconds"] for s in sessions if s.get("wall_clock_seconds") is not None]
