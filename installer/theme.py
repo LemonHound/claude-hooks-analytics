@@ -22,6 +22,7 @@ def apply_theme(root):
     style.configure("TButton", background=PANEL, foreground=FG)
     style.configure("Accent.TButton", background=ACCENT, foreground="#ffffff")
     style.configure("TCheckbutton", background=BG, foreground=FG)
+    style.configure("Link.TLabel", background=BG, foreground=ACCENT)
     style.configure("TEntry", fieldbackground=PANEL, foreground=FG)
     style.map("TButton", background=[("active", ACCENT)])
     style.map("TCheckbutton", background=[("active", BG)])

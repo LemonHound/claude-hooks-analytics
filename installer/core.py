@@ -133,3 +133,11 @@ def install(selected, hooks_dir, runs_dir, settings_path, python, src_hooks_dir,
     merged = merge_settings(settings, selected, python, hooks_dir, managed)
     write_settings(settings_path, merged)
     return merged
+
+
+def analytics_command(python, repo_root, tool, runs_dir, output_path=None):
+    script = Path(repo_root) / "analytics" / f"{tool}.py"
+    cmd = [str(python), str(script), "--runs-dir", str(runs_dir)]
+    if output_path is not None:
+        cmd += ["--output", str(output_path)]
+    return cmd

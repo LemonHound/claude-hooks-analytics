@@ -36,15 +36,20 @@ outcome (commit / push / PR / merge).
 
 ## Read your data
 
-From the repo, after installing:
+Open the app (`install.cmd` / `install.sh`) and use the **Analytics** section: the
+**Text report** and **Open dashboard** buttons run against your Data dir and show a
+clickable link to the output. You can do this any time, not just right after
+installing.
+
+Or run them from the repo directly:
 
 ```
 python analytics/analyze.py            # terminal report
 python analytics/dashboard.py          # opens an HTML dashboard in your browser
 ```
 
-Both accept `--days N` and `--runs-dir PATH`. If you chose a custom data directory,
-pass it with `--runs-dir`; the installer prints the exact commands when it finishes.
+Both accept `--days N` and `--runs-dir PATH`; pass `--runs-dir` if you chose a
+custom data directory.
 
 ## Tag sessions (optional)
 

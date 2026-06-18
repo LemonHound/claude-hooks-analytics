@@ -1,4 +1,7 @@
+import os
+import subprocess
 import sys
+import threading
 from pathlib import Path
 from tkinter import BooleanVar, Checkbutton, StringVar, Tk, Text, filedialog, ttk, END, DISABLED, NORMAL, W
 
@@ -23,11 +26,24 @@ def _browse_file(var):
         var.set(chosen)
 
 
+def _open_path(path):
+    p = str(path)
+    try:
+        if sys.platform == "win32":
+            os.startfile(p)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", p])
+        else:
+            subprocess.Popen(["xdg-open", p])
+    except Exception:
+        pass
+
+
 def run():
     defaults = core.default_paths()
     root = Tk()
-    root.title("Claude Hooks Analytics Installer")
-    root.geometry("780x680")
+    root.title("Claude Hooks Analytics")
+    root.geometry("780x740")
     apply_theme(root)
 
     hooks_var = StringVar(value=str(defaults["hooks_dir"]))
@@ -69,13 +85,7 @@ def run():
         ).pack(side="left")
         ttk.Label(row, text="  " + c["description"], style="Muted.TLabel").pack(side="left")
 
-    tools = [c for c in COMPONENTS if c["kind"] == "tool"]
-    if tools:
-        ttk.Label(frm, text="Included tools (run from the repo)", style="Muted.TLabel").pack(anchor=W, pady=(8, 2))
-        for c in tools:
-            ttk.Label(frm, text=f"  {c['label']}: {c['path']}", style="Muted.TLabel").pack(anchor=W)
-
-    status = Text(frm, height=9, wrap="word", bg="#2b2d31", fg="#e6e6e6", insertbackground="#e6e6e6", relief="flat", state=DISABLED)
+    status = Text(frm, height=6, wrap="word", bg="#2b2d31", fg="#e6e6e6", insertbackground="#e6e6e6", relief="flat", state=DISABLED)
 
     def log(msg):
         status.configure(state=NORMAL)
@@ -96,12 +106,74 @@ def run():
         log("Install complete.")
         log(f"Hooks -> {hooks_var.get()}")
         log(f"Data  -> {runs_var.get()}")
-        log("Run your analytics with:")
-        py = sys.executable
-        log(f'  "{py}" "{REPO_ROOT / "analytics" / "analyze.py"}" --runs-dir "{runs_var.get()}"')
-        log(f'  "{py}" "{REPO_ROOT / "analytics" / "dashboard.py"}" --runs-dir "{runs_var.get()}"')
 
-    ttk.Button(frm, text="Install", command=do_install, style="Accent.TButton").pack(pady=12)
-    status.pack(fill="both", expand=True)
+    ttk.Button(frm, text="Install", command=do_install, style="Accent.TButton").pack(anchor=W, pady=12)
+    status.pack(fill="x")
+
+    ttk.Separator(frm).pack(fill="x", pady=10)
+    ttk.Label(frm, text="Analytics", style="Heading.TLabel").pack(anchor=W, pady=(0, 8))
+
+    results = ttk.Frame(frm)
+
+    def _show_message(text):
+        for w in results.winfo_children():
+            w.destroy()
+        ttk.Label(results, text=text, style="Muted.TLabel").pack(anchor=W)
+
+    def _show_link(text, path):
+        for w in results.winfo_children():
+            w.destroy()
+        link = ttk.Label(results, text=text, style="Link.TLabel", cursor="hand2")
+        link.bind("<Button-1>", lambda e: _open_path(path))
+        link.pack(anchor=W)
+
+    def _run_tool(tool, output_path, on_done):
+        cmd = core.analytics_command(sys.executable, REPO_ROOT, tool, runs_var.get(), output_path)
+
+        def work():
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
+            except Exception as exc:
+                root.after(0, lambda: _show_message(f"Failed: {exc}"))
+                return
+            root.after(0, lambda: on_done(proc))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _run_report():
+        _show_message("Running report...")
+        out = Path(runs_var.get()) / "report.txt"
+
+        def done(proc):
+            if proc.returncode != 0:
+                _show_message((proc.stderr or "No session data found.").strip())
+                return
+            try:
+                out.write_text(proc.stdout, encoding="utf-8")
+            except Exception as exc:
+                _show_message(f"Could not save report: {exc}")
+                return
+            _show_link(f"Open report ({out.name})", out)
+
+        _run_tool("analyze", None, done)
+
+    def _run_dashboard():
+        _show_message("Building dashboard...")
+        out = Path(runs_var.get()) / "dashboard.html"
+
+        def done(proc):
+            if proc.returncode != 0:
+                _show_message((proc.stderr or "No session data found.").strip())
+                return
+            _show_link(f"Open dashboard ({out.name})", out)
+
+        _run_tool("dashboard", out, done)
+
+    btns = ttk.Frame(frm)
+    btns.pack(fill="x")
+    ttk.Button(btns, text="Text report", command=_run_report).pack(side="left")
+    ttk.Button(btns, text="Open dashboard", command=_run_dashboard).pack(side="left", padx=8)
+    results.pack(fill="x", pady=(8, 0))
 
     root.mainloop()
