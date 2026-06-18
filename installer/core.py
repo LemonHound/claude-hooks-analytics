@@ -72,3 +72,64 @@ def merge_settings(settings, selected, python, hooks_dir, managed_scripts):
         hooks_obj.setdefault(event, []).append(entry)
     settings["hooks"] = hooks_obj
     return settings
+
+
+def shared_modules(src_hooks_dir):
+    return sorted(p.name for p in Path(src_hooks_dir).glob("_*.py"))
+
+
+def copy_components(selected, src_hooks_dir, dest_hooks_dir):
+    src = Path(src_hooks_dir)
+    dest = Path(dest_hooks_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    for comp in selected:
+        if comp.get("kind") not in ("hook", "support"):
+            continue
+        script = comp.get("script")
+        if script:
+            shutil.copy2(src / script, dest / script)
+    for name in shared_modules(src):
+        shutil.copy2(src / name, dest / name)
+
+
+def write_install_config(hooks_dir, runs_dir):
+    path = Path(hooks_dir) / "installer_config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"runs_dir": str(runs_dir)}, indent=2), encoding="utf-8")
+    return path
+
+
+def create_runs_dirs(runs_dir):
+    base = Path(runs_dir)
+    for sub in ("", "events", "sessions", "prompts"):
+        (base / sub).mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def read_settings(path):
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def write_settings(path, settings):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    os.replace(tmp, p)
+    return p
+
+
+def install(selected, hooks_dir, runs_dir, settings_path, python, src_hooks_dir, managed):
+    copy_components(selected, src_hooks_dir, hooks_dir)
+    write_install_config(hooks_dir, runs_dir)
+    create_runs_dirs(runs_dir)
+    settings = read_settings(settings_path)
+    merged = merge_settings(settings, selected, python, hooks_dir, managed)
+    write_settings(settings_path, merged)
+    return merged
