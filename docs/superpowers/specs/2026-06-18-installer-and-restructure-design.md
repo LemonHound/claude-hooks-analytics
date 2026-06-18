@@ -85,7 +85,6 @@ Pure functions, no Tkinter, fully unit-testable:
   avoid stale duplicates when relocating/reinstalling) and add the new entry
   pointing at the chosen hooks dir. Deselected components are removed.
 - create data directories (`runs/`, `runs/events`, `runs/sessions`, `runs/prompts`)
-- generate convenience launchers for the analytics tools that pass `--runs-dir`
 
 ### ui.py + theme.py
 
@@ -113,11 +112,13 @@ Analyzers (`analyze.py`, `dashboard.py`) resolve by precedence:
 
 1. `--runs-dir` argument
 2. `CLAUDE_HOOKS_RUNS_DIR` environment variable
-3. default `~/.claude/runs`
+3. `installer_config.json` at the default hooks location (`~/.claude/hooks/`)
+4. default `~/.claude/runs`
 
-The installer-generated launchers pass `--runs-dir` so manual env setup is not
-required. No shell-profile or registry edits; hooks read a file next to themselves,
-so it works on any OS.
+The installer's result screen prints ready-to-run analytics commands with the
+chosen `--runs-dir` so a custom data dir works with copy-paste and no env setup. No
+shell-profile or registry edits; hooks read a file next to themselves, so it works
+on any OS.
 
 ## Entry scripts
 
