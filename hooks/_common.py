@@ -10,7 +10,23 @@ from typing import Callable
 
 SCHEMA_VERSION = 2
 
-RUNS_DIR = Path(os.path.expanduser("~/.claude/runs"))
+def resolve_runs_dir(env=None, config_path=None):
+    env = env if env is not None else os.environ
+    val = env.get("CLAUDE_HOOKS_RUNS_DIR")
+    if val:
+        return Path(os.path.expanduser(val))
+    cfg = Path(config_path) if config_path is not None else (Path(__file__).resolve().parent / "installer_config.json")
+    try:
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+        rd = data.get("runs_dir")
+        if rd:
+            return Path(os.path.expanduser(rd))
+    except Exception:
+        pass
+    return Path(os.path.expanduser("~/.claude/runs"))
+
+
+RUNS_DIR = resolve_runs_dir()
 EVENTS_DIR = RUNS_DIR / "events"
 ARTIFACTS_DIR = RUNS_DIR
 SESSIONS_DIR = RUNS_DIR / "sessions"
