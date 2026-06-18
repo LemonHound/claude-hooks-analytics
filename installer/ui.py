@@ -120,13 +120,6 @@ def run():
             w.destroy()
         ttk.Label(results, text=text, style="Muted.TLabel").pack(anchor=W)
 
-    def _show_link(text, path):
-        for w in results.winfo_children():
-            w.destroy()
-        link = ttk.Label(results, text=text, style="Link.TLabel", cursor="hand2")
-        link.bind("<Button-1>", lambda e: _open_path(path))
-        link.pack(anchor=W)
-
     def _run_tool(tool, output_path, on_done):
         cmd = core.analytics_command(sys.executable, REPO_ROOT, tool, runs_var.get(), output_path)
 
@@ -154,7 +147,8 @@ def run():
             except Exception as exc:
                 _show_message(f"Could not save report: {exc}")
                 return
-            _show_link(f"Open report ({out.name})", out)
+            _open_path(out)
+            _show_message(f"Opened {out}")
 
         _run_tool("analyze", None, done)
 
@@ -166,7 +160,8 @@ def run():
             if proc.returncode != 0:
                 _show_message((proc.stderr or "No session data found.").strip())
                 return
-            _show_link(f"Open dashboard ({out.name})", out)
+            _open_path(out)
+            _show_message(f"Opened {out}")
 
         _run_tool("dashboard", out, done)
 
