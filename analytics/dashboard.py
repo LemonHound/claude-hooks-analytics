@@ -14,6 +14,24 @@ RUNS_DIR = Path.home() / ".claude" / "runs"
 SESSIONS_DIR = RUNS_DIR / "sessions"
 
 
+def _resolve_runs_dir(override=None, env=None, config_path=None):
+    if override:
+        return Path(override)
+    env = env if env is not None else os.environ
+    val = env.get("CLAUDE_HOOKS_RUNS_DIR")
+    if val:
+        return Path(os.path.expanduser(val))
+    cfg = Path(config_path) if config_path is not None else Path(os.path.expanduser("~/.claude/hooks/installer_config.json"))
+    try:
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+        rd = data.get("runs_dir")
+        if rd:
+            return Path(os.path.expanduser(rd))
+    except Exception:
+        pass
+    return Path.home() / ".claude" / "runs"
+
+
 def _load_sessions(days, runs_dir):
     sd = runs_dir / "sessions"
     if not sd.exists():
@@ -994,7 +1012,7 @@ def main():
     ap.add_argument("--output", default=None, help="Write HTML to file instead of opening browser")
     args = ap.parse_args()
 
-    runs_dir = Path(args.runs_dir) if args.runs_dir else RUNS_DIR
+    runs_dir = _resolve_runs_dir(args.runs_dir)
 
     sessions = _load_sessions(args.days, runs_dir)
     if args.session:

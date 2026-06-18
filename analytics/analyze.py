@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -9,6 +10,24 @@ from pathlib import Path
 
 RUNS_DIR = Path.home() / ".claude" / "runs"
 SESSIONS_DIR = RUNS_DIR / "sessions"
+
+
+def _resolve_runs_dir(override=None, env=None, config_path=None):
+    if override:
+        return Path(override)
+    env = env if env is not None else os.environ
+    val = env.get("CLAUDE_HOOKS_RUNS_DIR")
+    if val:
+        return Path(os.path.expanduser(val))
+    cfg = Path(config_path) if config_path is not None else Path(os.path.expanduser("~/.claude/hooks/installer_config.json"))
+    try:
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+        rd = data.get("runs_dir")
+        if rd:
+            return Path(os.path.expanduser(rd))
+    except Exception:
+        pass
+    return Path.home() / ".claude" / "runs"
 
 
 def _load_sessions(days: int | None) -> list[dict]:
@@ -373,9 +392,8 @@ def main():
     args = ap.parse_args()
 
     global RUNS_DIR, SESSIONS_DIR
-    if args.runs_dir:
-        RUNS_DIR = Path(args.runs_dir)
-        SESSIONS_DIR = RUNS_DIR / "sessions"
+    RUNS_DIR = _resolve_runs_dir(args.runs_dir)
+    SESSIONS_DIR = RUNS_DIR / "sessions"
 
     sessions = _load_sessions(args.days)
     if args.session:
