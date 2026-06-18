@@ -5,7 +5,8 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _common import append_event, read_stdin_json, now_iso, store_prompt, update_agent_map
-from _segments import classify_bash, classify_powershell, classify_segments, extract_mutation_targets
+from _churn import compute_churn
+from _segments import classify_bash, classify_powershell, classify_segments, extract_mutation_targets, parse_mcp_tool
 from _text import normalize_command, normalize_text
 
 
@@ -45,6 +46,9 @@ def build_event(payload: dict, now_fn: Callable[[], str] = now_iso) -> dict:
         bash_segment_categories = classify_segments(cmd, "powershell")
         bash_file_targets = extract_mutation_targets(cmd, "powershell")
 
+    churn = compute_churn(tool_name, tool_input)
+    mcp_server, mcp_tool = parse_mcp_tool(tool_name)
+
     event = {
         "phase": "pre_tool",
         "session_id": session_id,
@@ -63,6 +67,10 @@ def build_event(payload: dict, now_fn: Callable[[], str] = now_iso) -> dict:
         "bash_categories": bash_categories,
         "bash_segment_categories": bash_segment_categories,
         "bash_file_targets": bash_file_targets,
+        "lines_added": churn["lines_added"],
+        "lines_removed": churn["lines_removed"],
+        "mcp_server": mcp_server,
+        "mcp_tool": mcp_tool,
         "timestamp_start": now_fn(),
     }
     if tool_name == "PowerShell":

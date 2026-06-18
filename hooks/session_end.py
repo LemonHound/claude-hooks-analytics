@@ -385,6 +385,12 @@ def build_rollup(
         None,
     )
 
+    compaction_count, compaction_triggers = _compaction_summary(events)
+    notification_count, notification_kinds, permission_request_count = _notification_summary(events)
+    lines_added, lines_removed = _churn_summary(pre)
+    mcp_call_count, mcp_server_breakdown = _mcp_summary(pre)
+    test_run_count, test_pass_total, test_fail_total, test_failed_runs = _test_summary(post)
+
     return {
         "schema_version": SCHEMA_VERSION,
         "session_id": session_id,
@@ -432,6 +438,20 @@ def build_rollup(
         "repeat_reads": repeat_reads,
         "whole_file_reads_over_500_lines": whole_file_reads_over_500_lines,
         "toolsearch_aggregate": toolsearch_aggregate,
+        "compaction_count": compaction_count,
+        "compaction_triggers": compaction_triggers,
+        "notification_count": notification_count,
+        "notification_kinds": notification_kinds,
+        "permission_request_count": permission_request_count,
+        "lines_added": lines_added,
+        "lines_removed": lines_removed,
+        "net_lines": lines_added - lines_removed,
+        "mcp_call_count": mcp_call_count,
+        "mcp_server_breakdown": mcp_server_breakdown,
+        "test_run_count": test_run_count,
+        "test_pass_total": test_pass_total,
+        "test_fail_total": test_fail_total,
+        "test_failed_runs": test_failed_runs,
         "stop_reason": payload.get("stop_reason") or "session_end",
         "ship_signals": ship_signals,
         "outcome": ship_signals.get("inferred_outcome", ""),
@@ -771,6 +791,58 @@ def _aggregate_toolsearch(pre_events: list[dict], post_events: list[dict]) -> di
         "queries": queries,
         "tools_loaded": sorted(loaded),
     }
+
+
+def _compaction_summary(events):
+    comp = [e for e in events if e.get("phase") == "compaction"]
+    triggers = {}
+    for e in comp:
+        t = e.get("trigger") or "unknown"
+        triggers[t] = triggers.get(t, 0) + 1
+    return len(comp), triggers
+
+
+def _notification_summary(events):
+    notes = [e for e in events if e.get("phase") == "notification"]
+    kinds = {}
+    for e in notes:
+        k = e.get("kind") or "other"
+        kinds[k] = kinds.get(k, 0) + 1
+    return len(notes), kinds, kinds.get("permission_request", 0)
+
+
+def _churn_summary(pre_events):
+    added = sum((e.get("lines_added") or 0) for e in pre_events)
+    removed = sum((e.get("lines_removed") or 0) for e in pre_events)
+    return added, removed
+
+
+def _mcp_summary(pre_events):
+    breakdown = {}
+    for e in pre_events:
+        srv = e.get("mcp_server")
+        if srv:
+            breakdown[srv] = breakdown.get(srv, 0) + 1
+    return sum(breakdown.values()), breakdown
+
+
+def _test_summary(post_events):
+    runs = 0
+    passed = 0
+    failed = 0
+    failed_runs = 0
+    for e in post_events:
+        t = e.get("test")
+        if not isinstance(t, dict):
+            continue
+        runs += 1
+        if isinstance(t.get("test_passed"), int):
+            passed += t["test_passed"]
+        if isinstance(t.get("test_failed"), int):
+            failed += t["test_failed"]
+        if t.get("test_outcome") == "failed":
+            failed_runs += 1
+    return runs, passed, failed, failed_runs
 
 
 if __name__ == "__main__":
