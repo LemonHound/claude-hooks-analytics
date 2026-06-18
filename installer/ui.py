@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
-from tkinter import BooleanVar, StringVar, Tk, Text, filedialog, ttk, END, DISABLED, NORMAL, W
+from tkinter import BooleanVar, Checkbutton, StringVar, Tk, Text, filedialog, ttk, END, DISABLED, NORMAL, W
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from installer import core
 from installer.manifest import COMPONENTS, managed_scripts
-from installer.theme import apply_theme
+from installer.theme import apply_theme, ACCENT, BG, FG
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_HOOKS = REPO_ROOT / "hooks"
@@ -61,7 +61,12 @@ def run():
         comp_vars[c["id"]] = v
         row = ttk.Frame(frm)
         row.pack(fill="x", pady=1)
-        ttk.Checkbutton(row, text=c["label"], variable=v).pack(side="left")
+        Checkbutton(
+            row, text=c["label"], variable=v,
+            bg=BG, fg=FG, selectcolor=ACCENT,
+            activebackground=BG, activeforeground=FG,
+            highlightthickness=0, bd=0, anchor="w",
+        ).pack(side="left")
         ttk.Label(row, text="  " + c["description"], style="Muted.TLabel").pack(side="left")
 
     tools = [c for c in COMPONENTS if c["kind"] == "tool"]
@@ -70,7 +75,7 @@ def run():
         for c in tools:
             ttk.Label(frm, text=f"  {c['label']}: {c['path']}", style="Muted.TLabel").pack(anchor=W)
 
-    status = Text(frm, height=9, wrap="word", bg="#2b2d31", fg="#e6e6e6", insertbackground="#e6e6e6", relief="flat")
+    status = Text(frm, height=9, wrap="word", bg="#2b2d31", fg="#e6e6e6", insertbackground="#e6e6e6", relief="flat", state=DISABLED)
 
     def log(msg):
         status.configure(state=NORMAL)

@@ -9,4 +9,5 @@ else
   echo "Python 3.12+ is required but was not found. Install it from https://www.python.org/downloads/ and retry." >&2
   exit 1
 fi
-exec "$PY" -m installer
+nohup "$PY" -m installer >/dev/null 2>&1 &
+disown 2>/dev/null || true
