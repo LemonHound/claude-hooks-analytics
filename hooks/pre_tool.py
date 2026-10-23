@@ -144,9 +144,11 @@ def _summarize_input(tool_name, tool_input):
         "PowerShell": ["command", "description"],
         "Grep": ["pattern", "path"],
         "Glob": ["pattern", "path"],
-        "Agent": ["description", "subagent_type", "prompt"],
-        "Task": ["description", "subagent_type", "prompt"],
+        "Agent": ["description", "subagent_type", "name", "run_in_background", "prompt"],
+        "Task": ["description", "subagent_type", "name", "run_in_background", "prompt"],
         "Skill": ["skill", "args"],
+        "SendMessage": ["to", "summary", "message"],
+        "mcp__ccd_session__start_session": ["initiation", "title", "name", "context", "model", "proposal_id"],
     }.get(tool_name, list(tool_input.keys())[:3])
     summary = {}
     for k in keys:
@@ -163,5 +165,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        pass
+        from _common import record_hook_error
+        record_hook_error(__file__)
     sys.exit(0)

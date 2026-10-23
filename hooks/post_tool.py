@@ -1,3 +1,5 @@
+import json
+import re
 import sys
 from pathlib import Path
 from typing import Callable
@@ -108,6 +110,22 @@ def _summarize_tool_input(tool_name, tool_input):
     return summary
 
 
+START_SESSION_TOOL_NAME = "mcp__ccd_session__start_session"
+
+STARTED_SESSION_ID_PATTERN = re.compile(r"session_id: (local_[0-9a-f-]+)")
+
+PROPOSED_TASK_ID_PATTERN = re.compile(r"task_id: (task_[0-9a-f]+)")
+
+
+def get_started_session_ids(tool_response) -> tuple[str | None, str | None]:
+    response_text = json.dumps(tool_response, default=str)
+    started_match = STARTED_SESSION_ID_PATTERN.search(response_text)
+    proposed_match = PROPOSED_TASK_ID_PATTERN.search(response_text)
+    started_session_id = started_match.group(1) if started_match else None
+    proposed_task_id = proposed_match.group(1) if proposed_match else None
+    return started_session_id, proposed_task_id
+
+
 def build_event(
     payload: dict,
     denial_signatures: tuple[str, ...] = (),
@@ -202,11 +220,18 @@ def build_event(
         if "test" in cats:
             test_info = parse_test_output(normalize_text(_concat_content_text(raw_content)), is_error)
 
+    started_session_id = None
+    proposed_task_id = None
+    if tool_name == START_SESSION_TOOL_NAME:
+        started_session_id, proposed_task_id = get_started_session_ids(tool_response)
+
     event = {
         "phase": "post_tool",
         "session_id": session_id,
         "tool_use_id": tool_use_id,
         "tool_name": tool_name,
+        "started_session_id": started_session_id,
+        "proposed_task_id": proposed_task_id,
         "model": model,
         "timestamp_end": now_fn(),
         "input_tokens": input_tok,
@@ -261,5 +286,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        pass
+        from _common import record_hook_error
+        record_hook_error(__file__)
     sys.exit(0)

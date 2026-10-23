@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -14,6 +15,25 @@ CORRECTION_CUES = (
     "rollback", "revert", "undo",
     "retry", "redo", "scrap",
 )
+
+
+CROSS_SESSION_FROM_PATTERN = re.compile(r'<cross-session-message from="([^"]+)"')
+
+APP_EVENT_TAGS = (
+    ("<ci-monitor-event>", "ci_monitor"),
+    ("<side-sessions-event>", "side_sessions"),
+    ("<task-notification>", "task_notification"),
+)
+
+
+def get_prompt_source(text: str) -> tuple[str, str | None]:
+    cross_session_match = CROSS_SESSION_FROM_PATTERN.search(text)
+    if cross_session_match is not None:
+        return "cross_session", cross_session_match.group(1)
+    for tag, source in APP_EVENT_TAGS:
+        if tag in text:
+            return source, None
+    return "user", None
 
 
 def _is_correction_like(text: str) -> bool:
@@ -41,6 +61,12 @@ def main():
     if isinstance(prompt_text, str):
         preview = prompt_text.strip().replace("\n", " ")[:200]
 
+    prompt_source = "user"
+    from_session_id = None
+    if isinstance(prompt_text, str):
+        prompt_source, from_session_id = get_prompt_source(prompt_text)
+    is_user_prompt = prompt_source == "user"
+
     event = {
         "phase": "user_prompt_submit",
         "session_id": session_id,
@@ -50,8 +76,10 @@ def main():
         "prompt_preview": preview,
         "prompt_char_len": char_len,
         "prompt_word_count": word_count,
-        "is_correction_like": _is_correction_like(prompt_text if isinstance(prompt_text, str) else ""),
-        "starts_with_slash": bool(preview and preview.startswith("/")),
+        "prompt_source": prompt_source,
+        "from_session_id": from_session_id,
+        "is_correction_like": is_user_prompt and _is_correction_like(prompt_text if isinstance(prompt_text, str) else ""),
+        "starts_with_slash": bool(is_user_prompt and preview.startswith("/")),
     }
     append_event(session_id, event)
 
@@ -60,5 +88,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        pass
+        from _common import record_hook_error
+        record_hook_error(__file__)
     sys.exit(0)

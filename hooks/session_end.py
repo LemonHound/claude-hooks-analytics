@@ -493,6 +493,14 @@ def _prune_sidecar(session_id: str, now_epoch: float | None = None) -> None:
         pass
 
 
+def get_logged_turn_indexes(events: list[dict]) -> set:
+    logged_turn_indexes = set()
+    for event in events:
+        if event.get("phase") == "turn_summary":
+            logged_turn_indexes.add(event.get("turn_index"))
+    return logged_turn_indexes
+
+
 def main():
     payload = read_stdin_json()
     session_id = payload.get("session_id") or payload.get("sessionId") or "unknown"
@@ -505,7 +513,10 @@ def main():
     _prune_sidecar(session_id)
 
     rollup = build_rollup(events, transcript_path, payload, artifacts=artifacts)
+    logged_turn_indexes = get_logged_turn_indexes(events)
     for turn in rollup.get("turns") or []:
+        if turn.get("turn_index") in logged_turn_indexes:
+            continue
         append_event(session_id, dict(turn))
     for flag in rollup.pop("_pending_red_flags", None) or []:
         append_event(session_id, dict(flag))
@@ -849,5 +860,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        pass
+        from _common import record_hook_error
+        record_hook_error(__file__)
     sys.exit(0)

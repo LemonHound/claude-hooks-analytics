@@ -272,5 +272,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        pass
+        from _common import record_hook_error
+        record_hook_error(__file__)
     sys.exit(0)
