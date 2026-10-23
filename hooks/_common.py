@@ -39,7 +39,8 @@ for d in (RUNS_DIR, EVENTS_DIR, SESSIONS_DIR, PROMPTS_DIR):
 
 def read_stdin_json():
     try:
-        raw = sys.stdin.read()
+        raw_bytes = sys.stdin.buffer.read()
+        raw = raw_bytes.decode("utf-8")
         if not raw.strip():
             return {}
         return json.loads(raw)
