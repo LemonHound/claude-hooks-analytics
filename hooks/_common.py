@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -64,6 +65,17 @@ def append_event(session_id, event):
         err = EVENTS_DIR / "_errors.log"
         with err.open("a", encoding="utf-8") as f:
             f.write(f"{now_iso()} append_event failed: {e}\n")
+
+
+def record_hook_error(script_path: str) -> None:
+    script_name = Path(script_path).name
+    error_text = traceback.format_exc().strip()
+    try:
+        err = EVENTS_DIR / "_errors.log"
+        with err.open("a", encoding="utf-8") as f:
+            f.write(f"{now_iso()} {script_name} failed:\n{error_text}\n")
+    except Exception:
+        pass
 
 
 def read_events(session_id):

@@ -89,5 +89,7 @@ if __name__ == "__main__":
     try:
         code = main()
     except Exception:
+        from _common import record_hook_error
+        record_hook_error(__file__)
         code = 0
     sys.exit(code or 0)
