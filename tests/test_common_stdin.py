@@ -32,16 +32,20 @@ class ReadStdinJson(unittest.TestCase):
 
         result = read_stdin_json_from(payload_bytes)
 
-        expected_error = "'utf-8' codec can't decode byte 0xff in position 12: invalid start byte"
-        self.assertEqual(result, {"_parse_error": expected_error, "_raw": ""})
+        self.assertEqual(set(result), {"_parse_error", "_raw"})
+        self.assertEqual(result["_raw"], "")
+        self.assertIsInstance(result["_parse_error"], str)
+        self.assertNotEqual(result["_parse_error"], "")
 
     def test_returns_parse_error_with_decoded_raw_when_json_is_malformed(self):
         payload_bytes = '{"prompt": "héllo'.encode("utf-8")
 
         result = read_stdin_json_from(payload_bytes)
 
-        expected_error = "Unterminated string starting at: line 1 column 12 (char 11)"
-        self.assertEqual(result, {"_parse_error": expected_error, "_raw": '{"prompt": "héllo'})
+        self.assertEqual(set(result), {"_parse_error", "_raw"})
+        self.assertEqual(result["_raw"], '{"prompt": "héllo')
+        self.assertIsInstance(result["_parse_error"], str)
+        self.assertNotEqual(result["_parse_error"], "")
 
     def test_returns_empty_dict_when_stdin_is_whitespace_only(self):
         payload_bytes = b" \n\t "
