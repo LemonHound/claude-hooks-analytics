@@ -117,7 +117,7 @@ def read_transcript_usage(path) -> Optional[dict]:
     model_first_seen = {}
     seen_index = 0
     any_usage = False
-    counted_message_ids = set()
+    last_totals_by_message_id = {}
     for msg in iter_assistant_messages(p):
         usage = msg.get("usage") or {}
         totals = _extract_message_totals(usage)
@@ -127,13 +127,9 @@ def read_transcript_usage(path) -> Optional[dict]:
             continue
         any_usage = True
         message_id = msg["raw"].get("id")
-        is_repeated_message = False
         if isinstance(message_id, str) and message_id:
-            if message_id in counted_message_ids:
-                is_repeated_message = True
-            else:
-                counted_message_ids.add(message_id)
-        if not is_repeated_message:
+            last_totals_by_message_id[message_id] = totals
+        else:
             for k in _DIRECT_KEYS:
                 sums[k] += totals[k]
         model = msg.get("model")
@@ -144,6 +140,9 @@ def read_transcript_usage(path) -> Optional[dict]:
                 seen_index += 1
     if not any_usage:
         return None
+    for totals in last_totals_by_message_id.values():
+        for k in _DIRECT_KEYS:
+            sums[k] += totals[k]
     dominant_model = None
     if model_counts:
         dominant_model = min(
