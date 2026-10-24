@@ -6,8 +6,7 @@ from typing import Callable
 from urllib.parse import urlparse, urlsplit, urlunsplit
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _common import append_event, read_stdin_json, now_iso, SCHEMA_VERSION
-from _config import DENIAL_SIGNATURES
+from _common import append_event, read_stdin_json, now_iso
 from _segments import classify_bash, classify_powershell
 from _testparse import parse_test_output
 from _text import normalize_text
@@ -84,32 +83,6 @@ def _extract_loaded_tool_names(text: str) -> list[str]:
     return sorted(names)
 
 
-def _summarize_tool_input(tool_name, tool_input):
-    if not isinstance(tool_input, dict):
-        return {}
-    keys = {
-        "Read": ["file_path", "offset", "limit"],
-        "Write": ["file_path"],
-        "Edit": ["file_path"],
-        "MultiEdit": ["file_path"],
-        "NotebookEdit": ["notebook_path"],
-        "Bash": ["command", "description"],
-        "PowerShell": ["command", "description"],
-        "Grep": ["pattern", "path"],
-        "Glob": ["pattern", "path"],
-        "Agent": ["description", "subagent_type", "prompt"],
-        "Task": ["description", "subagent_type", "prompt"],
-        "Skill": ["skill", "args"],
-    }.get(tool_name, list(tool_input.keys())[:3])
-    summary = {}
-    for k in keys:
-        if k not in tool_input:
-            continue
-        value = tool_input.get(k, "")
-        summary[k] = str(value)[:200]
-    return summary
-
-
 START_SESSION_TOOL_NAME = "mcp__ccd_session__start_session"
 
 STARTED_SESSION_ID_PATTERN = re.compile(r"session_id: (local_[0-9a-f-]+)")
@@ -128,9 +101,8 @@ def get_started_session_ids(tool_response) -> tuple[str | None, str | None]:
 
 def build_event(
     payload: dict,
-    denial_signatures: tuple[str, ...] = (),
     now_fn: Callable[[], str] = now_iso,
-) -> tuple[dict, dict | None]:
+) -> dict:
     session_id = payload.get("session_id") or payload.get("sessionId") or "unknown"
     tool_name = payload.get("tool_name") or payload.get("toolName") or ""
     tool_use_id = payload.get("tool_use_id") or payload.get("toolUseId")
@@ -147,9 +119,15 @@ def build_event(
     cache_read = usage.get("cache_read_input_tokens") or usage.get("cacheReadInputTokens")
     cache_creation = usage.get("cache_creation_input_tokens") or usage.get("cacheCreationInputTokens")
 
+    is_failure = payload.get("hook_event_name") == "PostToolUseFailure"
+    failure_error_text = str(payload.get("error") or "")
+
     is_error = bool(tool_response.get("is_error")) if isinstance(tool_response, dict) else False
     error_message = None
-    if is_error and isinstance(tool_response, dict):
+    if is_failure:
+        is_error = True
+        error_message = failure_error_text[:500] or None
+    elif is_error and isinstance(tool_response, dict):
         content = tool_response.get("content") or ""
         if isinstance(content, list):
             content = " ".join(
@@ -218,7 +196,11 @@ def build_event(
         cmd = tool_input.get("command") or ""
         cats = classify_bash(cmd) if tool_name == "Bash" else classify_powershell(cmd)
         if "test" in cats:
-            test_info = parse_test_output(normalize_text(_concat_content_text(raw_content)), is_error)
+            if is_failure:
+                test_output = failure_error_text
+            else:
+                test_output = _concat_content_text(raw_content)
+            test_info = parse_test_output(normalize_text(test_output), is_error)
 
     started_session_id = None
     proposed_task_id = None
@@ -252,34 +234,14 @@ def build_event(
         "test": test_info,
     }
 
-    red_flag = None
-    if is_error and isinstance(error_message, str) and denial_signatures:
-        normalized = normalize_text(error_message).lower()
-        for sig in denial_signatures:
-            if sig.lower() in normalized:
-                red_flag = {
-                    "phase": "red_flag",
-                    "kind": "permission_denied",
-                    "inferred_from": "is_error_signature",
-                    "tool_name": tool_name,
-                    "tool_use_id": tool_use_id,
-                    "tool_input_summary": _summarize_tool_input(tool_name, tool_input),
-                    "prompt_hash": None,
-                    "turn_index": None,
-                    "schema_version": SCHEMA_VERSION,
-                }
-                break
-
-    return event, red_flag
+    return event
 
 
 def main():
     payload = read_stdin_json()
     session_id = payload.get("session_id") or payload.get("sessionId") or "unknown"
-    event, red_flag = build_event(payload, DENIAL_SIGNATURES)
+    event = build_event(payload)
     append_event(session_id, event)
-    if red_flag is not None:
-        append_event(session_id, red_flag)
 
 
 if __name__ == "__main__":

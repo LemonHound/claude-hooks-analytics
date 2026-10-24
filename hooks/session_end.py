@@ -324,18 +324,15 @@ def build_rollup(
     peak_input_tokens, final_input_tokens = _walk_assistant_messages(transcript_path)
 
     ship_signals = _infer_ship_outcome(pre)
-    existing_red_flags = [e for e in events if e.get("phase") == "red_flag"]
+    persisted_red_flags = []
+    for e in events:
+        if e.get("phase") != "red_flag":
+            continue
+        if e.get("inferred_from") == "missing_post_tool":
+            continue
+        persisted_red_flags.append(e)
     derived_permission_flags = derive_permission_denied_red_flags(events)
-    existing_permission_ids = {
-        rf.get("tool_use_id")
-        for rf in existing_red_flags
-        if rf.get("kind") == "permission_denied" and rf.get("tool_use_id") is not None
-    }
-    new_permission_flags = [
-        rf for rf in derived_permission_flags
-        if rf.get("tool_use_id") not in existing_permission_ids
-    ]
-    red_flags = existing_red_flags + new_permission_flags
+    red_flags = persisted_red_flags + derived_permission_flags
     permission_denied_flags = [rf for rf in red_flags if rf.get("kind") == "permission_denied"]
     permission_denied_tools: dict[str, int] = {}
     for rf in permission_denied_flags:
@@ -376,8 +373,6 @@ def build_rollup(
 
     skills_aggregate = _build_skills_aggregate(pre, turns)
     tool_call_count = len(pre)
-    pending_red_flags: list[dict] = []
-    pending_red_flags.extend(new_permission_flags)
 
     account_tag = next(
         (e.get("account_tag") for e in events
@@ -455,7 +450,6 @@ def build_rollup(
         "stop_reason": payload.get("stop_reason") or "session_end",
         "ship_signals": ship_signals,
         "outcome": ship_signals.get("inferred_outcome", ""),
-        "_pending_red_flags": pending_red_flags,
     }
 
 
@@ -518,8 +512,6 @@ def main():
         if turn.get("turn_index") in logged_turn_indexes:
             continue
         append_event(session_id, dict(turn))
-    for flag in rollup.pop("_pending_red_flags", None) or []:
-        append_event(session_id, dict(flag))
     write_session_rollup(session_id, rollup)
 
 

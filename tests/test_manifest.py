@@ -25,6 +25,17 @@ class Manifest(unittest.TestCase):
             if c["kind"] == "tool":
                 self.assertTrue((REPO / c["path"]).exists(), c["path"])
 
+    def test_post_tool_failure_hook_runs_post_tool_for_every_tool_asynchronously(self):
+        failure_hooks = [c for c in COMPONENTS if c.get("event") == "PostToolUseFailure"]
+
+        self.assertEqual(len(failure_hooks), 1)
+        failure_hook = failure_hooks[0]
+        self.assertEqual(failure_hook["kind"], "hook")
+        self.assertEqual(failure_hook["matcher"], ".*")
+        self.assertEqual(failure_hook["async"], True)
+        self.assertEqual(failure_hook["script"], "post_tool.py")
+        self.assertEqual(failure_hook["default_enabled"], True)
+
     def test_managed_scripts_lists_every_hook_and_support(self):
         expected = {c["script"] for c in COMPONENTS if c.get("script")}
         self.assertEqual(set(managed_scripts()), expected)
