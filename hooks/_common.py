@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import string
 import sys
 import time
 import traceback
@@ -10,6 +11,11 @@ from typing import Callable
 
 
 SCHEMA_VERSION = 3
+
+FILENAME_SAFE_CHARACTERS = set(string.ascii_letters + string.digits + "._-")
+ARTIFACT_TASK_ID_MAX_CHARS = 80
+ARTIFACT_AGENT_MAX_CHARS = 60
+ARTIFACT_SUFFIX_MAX_CHARS = 15
 
 def resolve_runs_dir(env=None, config_path=None):
     env = env if env is not None else os.environ
@@ -135,13 +141,27 @@ def write_subagent_counted_usage(session_id: str, agent_id: str, counted_usage: 
     path.write_text(json.dumps(counted_usage), encoding="utf-8")
 
 
+def get_filename_safe_text(text, max_chars):
+    safe_characters = []
+    for character in str(text):
+        if character in FILENAME_SAFE_CHARACTERS:
+            safe_characters.append(character)
+        else:
+            safe_characters.append("_")
+    safe_text = "".join(safe_characters)
+    return safe_text[:max_chars]
+
+
 def write_artifact(artifact):
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     task_id = artifact.get("task_id") or "notask"
     agent = artifact.get("agent") or "unknown"
     ts = artifact.get("timestamp_end") or now_iso()
-    suffix = ts.replace(":", "").replace("-", "").replace(".", "")[:15]
-    fname = f"{date}_{task_id}_{agent}_{suffix}.json"
+    suffix = ts.replace(":", "").replace("-", "").replace(".", "")
+    safe_task_id = get_filename_safe_text(task_id, ARTIFACT_TASK_ID_MAX_CHARS)
+    safe_agent = get_filename_safe_text(agent, ARTIFACT_AGENT_MAX_CHARS)
+    safe_suffix = get_filename_safe_text(suffix, ARTIFACT_SUFFIX_MAX_CHARS)
+    fname = f"{date}_{safe_task_id}_{safe_agent}_{safe_suffix}.json"
     path = ARTIFACTS_DIR / fname
     with path.open("w", encoding="utf-8") as f:
         json.dump(artifact, f, indent=2, default=str)
