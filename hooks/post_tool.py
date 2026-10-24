@@ -50,6 +50,18 @@ def _concat_content_text(content) -> str:
     return ""
 
 
+def _get_shell_output_text(tool_response) -> str:
+    if not isinstance(tool_response, dict):
+        return ""
+    stdout = tool_response.get("stdout")
+    if not isinstance(stdout, str):
+        stdout = ""
+    stderr = tool_response.get("stderr")
+    if not isinstance(stderr, str):
+        stderr = ""
+    return stdout + "\n" + stderr
+
+
 def _parse_host(url):
     if not url or not isinstance(url, str):
         return None
@@ -199,7 +211,7 @@ def build_event(
             if is_failure:
                 test_output = failure_error_text
             else:
-                test_output = _concat_content_text(raw_content)
+                test_output = _get_shell_output_text(tool_response)
             test_info = parse_test_output(normalize_text(test_output), is_error)
 
     started_session_id = None
