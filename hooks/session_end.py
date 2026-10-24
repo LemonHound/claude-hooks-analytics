@@ -32,17 +32,24 @@ def _parse_message_epoch(ts):
         return None
 
 
+def _get_context_tokens(usage):
+    context_tokens = 0
+    for key in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
+        value = usage.get(key)
+        if isinstance(value, int):
+            context_tokens += value
+    return context_tokens
+
+
 def _walk_assistant_messages(transcript_path):
     peak = None
     final = None
     for msg in iter_assistant_messages(transcript_path):
         usage = msg.get("usage") or {}
-        it = usage.get("input_tokens")
-        if not isinstance(it, int):
-            it = 0
-        if peak is None or it > peak:
-            peak = it
-        final = it
+        context_tokens = _get_context_tokens(usage)
+        if peak is None or context_tokens > peak:
+            peak = context_tokens
+        final = context_tokens
     return peak, final
 
 
@@ -69,6 +76,7 @@ def build_turn_summaries(events: list[dict], transcript_path: str | None) -> lis
             "output_tokens": int(usage.get("output_tokens") or 0),
             "cache_read": int(usage.get("cache_read_input_tokens") or 0),
             "cache_creation": int(usage.get("cache_creation_input_tokens") or 0),
+            "context_tokens": _get_context_tokens(usage),
         })
 
     summaries: list[dict] = []
@@ -124,9 +132,9 @@ def build_turn_summaries(events: list[dict], transcript_path: str | None) -> lis
             tokens_out += tm["output_tokens"]
             cache_read += tm["cache_read"]
             cache_creation += tm["cache_creation"]
-            if peak is None or tm["input_tokens"] > peak:
-                peak = tm["input_tokens"]
-            final = tm["input_tokens"]
+            if peak is None or tm["context_tokens"] > peak:
+                peak = tm["context_tokens"]
+            final = tm["context_tokens"]
 
         wall = round(end - start, 3) if isinstance(start, (int, float)) and isinstance(end, (int, float)) else 0.0
         if wall < 0:
