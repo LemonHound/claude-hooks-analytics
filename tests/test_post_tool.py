@@ -122,6 +122,76 @@ class FailurePayload(unittest.TestCase):
         self.assertEqual(event["test"], {"test_passed": 4, "test_failed": 1, "test_outcome": "failed"})
 
 
+def get_successful_test_command_payload(tool_response, tool_name="Bash"):
+    return {
+        "session_id": "session-a",
+        "hook_event_name": "PostToolUse",
+        "tool_name": tool_name,
+        "tool_input": {"command": "python -m pytest -q"},
+        "tool_use_id": "toolu_example_3",
+        "tool_response": tool_response,
+    }
+
+
+class SuccessfulShellTestOutput(unittest.TestCase):
+    def test_successful_bash_test_command_reads_test_result_from_stdout(self):
+        payload = get_successful_test_command_payload({"stdout": "3 passed, 1 failed in 0.20s", "stderr": ""})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 3, "test_failed": 1, "test_outcome": "failed"})
+
+    def test_successful_powershell_test_command_reads_test_result_from_stdout(self):
+        tool_response = {"stdout": "4 passed in 0.10s", "stderr": ""}
+        payload = get_successful_test_command_payload(tool_response, tool_name="PowerShell")
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 4, "test_failed": None, "test_outcome": "passed"})
+
+    def test_test_summary_only_in_stderr_is_parsed(self):
+        payload = get_successful_test_command_payload({"stdout": "", "stderr": "5 passed in 0.10s"})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 5, "test_failed": None, "test_outcome": "passed"})
+
+    def test_counts_split_across_stdout_and_stderr_are_both_read(self):
+        payload = get_successful_test_command_payload({"stdout": "3 passed", "stderr": "2 failed"})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 3, "test_failed": 2, "test_outcome": "failed"})
+
+    def test_passed_count_in_stdout_wins_over_passed_count_in_stderr(self):
+        payload = get_successful_test_command_payload({"stdout": "3 passed", "stderr": "5 passed"})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"]["test_passed"], 3)
+
+    def test_missing_stdout_counts_as_empty(self):
+        payload = get_successful_test_command_payload({"stderr": "5 passed"})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 5, "test_failed": None, "test_outcome": "passed"})
+
+    def test_non_string_stdout_counts_as_empty(self):
+        payload = get_successful_test_command_payload({"stdout": 42, "stderr": "5 passed"})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 5, "test_failed": None, "test_outcome": "passed"})
+
+    def test_test_summary_only_in_content_is_not_read(self):
+        payload = get_successful_test_command_payload({"content": "5 passed", "stdout": "", "stderr": ""})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": None, "test_failed": None, "test_outcome": "unknown"})
+
+
 class NoRedFlags(unittest.TestCase):
     def test_failure_reading_like_permission_denial_writes_no_red_flag(self):
         payload = get_failure_payload(error="Permission denied by user")
