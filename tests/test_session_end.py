@@ -3,6 +3,7 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -122,6 +123,100 @@ class StopWritesNoFlags(unittest.TestCase):
         for line in lines:
             phases.append(json.loads(line)["phase"])
         self.assertNotIn("red_flag", phases)
+
+
+TURN_START_EPOCH = 1792800000.0
+
+
+def get_assistant_line(usage, seconds_after_turn_start=10):
+    message_epoch = TURN_START_EPOCH + seconds_after_turn_start
+    timestamp = datetime.fromtimestamp(message_epoch, timezone.utc).isoformat()
+    message = {"role": "assistant", "model": "model-a", "usage": usage}
+    return json.dumps({"timestamp": timestamp, "message": message})
+
+
+LARGE_INPUT_SMALL_CONTEXT_USAGE = {"input_tokens": 50, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+LARGEST_CONTEXT_USAGE = {"input_tokens": 5, "cache_read_input_tokens": 1000, "cache_creation_input_tokens": 200}
+LAST_CONTEXT_USAGE = {"input_tokens": 4, "cache_read_input_tokens": 300, "cache_creation_input_tokens": 6}
+
+
+class ContextTokens(unittest.TestCase):
+    def setUp(self):
+        transcript_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(transcript_dir.cleanup)
+        self.transcript_path = Path(transcript_dir.name) / "transcript.jsonl"
+
+    def write_transcript(self, lines):
+        self.transcript_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def build_rollup_of_transcript(self):
+        return session_end.build_rollup([], str(self.transcript_path), {"session_id": "session-a"}, artifacts=[])
+
+    def build_single_turn_of_transcript(self):
+        events = [
+            {"phase": "user_prompt_submit", "prompt_hash": "prompt-a", "_epoch": TURN_START_EPOCH},
+            {"phase": "session_end", "_epoch": TURN_START_EPOCH + 100},
+        ]
+        turns = session_end.build_turn_summaries(events, str(self.transcript_path))
+        self.assertEqual(len(turns), 1)
+        return turns[0]
+
+    def test_rollup_peak_is_the_largest_input_plus_cache_tokens(self):
+        self.write_transcript([
+            get_assistant_line(LARGE_INPUT_SMALL_CONTEXT_USAGE),
+            get_assistant_line(LARGEST_CONTEXT_USAGE),
+            get_assistant_line(LAST_CONTEXT_USAGE),
+        ])
+
+        rollup = self.build_rollup_of_transcript()
+
+        self.assertEqual(rollup["peak_input_tokens"], 1205)
+
+    def test_rollup_final_is_input_plus_cache_tokens_of_the_last_message(self):
+        self.write_transcript([
+            get_assistant_line(LARGEST_CONTEXT_USAGE),
+            get_assistant_line(LAST_CONTEXT_USAGE),
+        ])
+
+        rollup = self.build_rollup_of_transcript()
+
+        self.assertEqual(rollup["final_input_tokens"], 310)
+
+    def test_missing_usage_field_counts_as_zero_in_context_size(self):
+        self.write_transcript([get_assistant_line({"input_tokens": 5, "cache_read_input_tokens": 100})])
+
+        rollup = self.build_rollup_of_transcript()
+
+        self.assertEqual(rollup["final_input_tokens"], 105)
+
+    def test_non_int_usage_field_counts_as_zero_in_context_size(self):
+        usage = {"input_tokens": 5, "cache_read_input_tokens": "100", "cache_creation_input_tokens": 7}
+        self.write_transcript([get_assistant_line(usage)])
+
+        rollup = self.build_rollup_of_transcript()
+
+        self.assertEqual(rollup["final_input_tokens"], 12)
+
+    def test_turn_peak_is_the_largest_input_plus_cache_tokens_in_its_window(self):
+        self.write_transcript([
+            get_assistant_line(LARGE_INPUT_SMALL_CONTEXT_USAGE, seconds_after_turn_start=10),
+            get_assistant_line(LARGEST_CONTEXT_USAGE, seconds_after_turn_start=20),
+            get_assistant_line(LAST_CONTEXT_USAGE, seconds_after_turn_start=30),
+        ])
+
+        turn = self.build_single_turn_of_transcript()
+
+        self.assertEqual(turn["peak_input_tokens"], 1205)
+
+    def test_turn_final_is_input_plus_cache_tokens_of_its_last_message(self):
+        self.write_transcript([
+            get_assistant_line(LARGEST_CONTEXT_USAGE, seconds_after_turn_start=10),
+            get_assistant_line(LAST_CONTEXT_USAGE, seconds_after_turn_start=20),
+        ])
+
+        turn = self.build_single_turn_of_transcript()
+
+        self.assertEqual(turn["final_input_tokens"], 310)
 
 
 if __name__ == "__main__":
