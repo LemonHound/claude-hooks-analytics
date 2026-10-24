@@ -92,7 +92,7 @@ def build_artifact(
     transcript_path: str | None,
     sidecar: dict | None,
     now_fn: Callable[[], str] = now_iso,
-    counted_usage: dict | None = None,
+    previously_counted_usage: dict | None = None,
 ) -> dict:
     session_id = payload.get("session_id") or payload.get("sessionId") or "unknown"
 
@@ -115,24 +115,24 @@ def build_artifact(
 
     transcript_usage = read_transcript_usage(transcript_path) if transcript_path else None
 
-    agent_counted_usage = None
+    deduped_usage_now = None
     if transcript_usage:
         input_tokens = transcript_usage["input_tokens"]
         output_tokens = transcript_usage["output_tokens"]
         cache_read = transcript_usage["cache_read_input_tokens"]
         cache_creation = transcript_usage["cache_creation_input_tokens"]
         if agent_id:
-            agent_counted_usage = {
+            deduped_usage_now = {
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 "cache_read_input_tokens": cache_read,
                 "cache_creation_input_tokens": cache_creation,
             }
-            if counted_usage:
-                input_tokens -= counted_usage.get("input_tokens") or 0
-                output_tokens -= counted_usage.get("output_tokens") or 0
-                cache_read -= counted_usage.get("cache_read_input_tokens") or 0
-                cache_creation -= counted_usage.get("cache_creation_input_tokens") or 0
+            if previously_counted_usage:
+                input_tokens -= previously_counted_usage.get("input_tokens") or 0
+                output_tokens -= previously_counted_usage.get("output_tokens") or 0
+                cache_read -= previously_counted_usage.get("cache_read_input_tokens") or 0
+                cache_creation -= previously_counted_usage.get("cache_creation_input_tokens") or 0
     else:
         input_tokens = sum((e.get("input_tokens") or 0) for e in post_events)
         output_tokens = sum((e.get("output_tokens") or 0) for e in post_events)
@@ -186,7 +186,7 @@ def build_artifact(
         "requested_agent": requested_agent,
         "requested_prompt_hash": requested_prompt_hash,
         "_consumed_sidecar_tool_use_id": consumed_tool_use_id,
-        "_agent_counted_usage": agent_counted_usage,
+        "_deduped_usage_now": deduped_usage_now,
         "model": model,
         "task_id": task_id,
         "task_hint": task_hint,
@@ -237,11 +237,11 @@ def main():
     transcript_path = payload.get("agent_transcript_path")
     sidecar = read_agent_map(session_id)
     agent_id = payload.get("agent_id") or payload.get("agentId")
-    counted_usage = None
+    previously_counted_usage = None
     if agent_id:
-        counted_usage = read_subagent_counted_usage(session_id, agent_id)
-    artifact = build_artifact(events, payload, transcript_path, sidecar, counted_usage=counted_usage)
-    agent_counted_usage = artifact.pop("_agent_counted_usage", None)
+        previously_counted_usage = read_subagent_counted_usage(session_id, agent_id)
+    artifact = build_artifact(events, payload, transcript_path, sidecar, previously_counted_usage=previously_counted_usage)
+    deduped_usage_now = artifact.pop("_deduped_usage_now", None)
     consumed = artifact.pop("_consumed_sidecar_tool_use_id", None)
     if consumed:
         try:
@@ -249,8 +249,8 @@ def main():
         except Exception:
             pass
     write_artifact(artifact)
-    if agent_counted_usage:
-        write_subagent_counted_usage(session_id, agent_id, agent_counted_usage)
+    if deduped_usage_now:
+        write_subagent_counted_usage(session_id, agent_id, deduped_usage_now)
 
 
 def _derive_outcome(error_count: int, files_written: list, tool_call_count: int) -> str:
