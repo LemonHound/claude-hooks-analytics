@@ -29,6 +29,14 @@ class SubagentCountedUsage(unittest.TestCase):
 
         self.assertIsNone(counted_usage)
 
+    def test_returns_none_when_the_state_file_holds_invalid_json(self):
+        state_path = _common.EVENTS_DIR / "session-a_agent-1_usage.json"
+        state_path.write_text('{"input_tokens": 1', encoding="utf-8")
+
+        counted_usage = _common.read_subagent_counted_usage("session-a", "agent-1")
+
+        self.assertIsNone(counted_usage)
+
     def test_returns_the_counted_usage_written_for_the_agent(self):
         _common.write_subagent_counted_usage("session-a", "agent-1", COUNTED_USAGE)
 
