@@ -11,11 +11,11 @@ import _common
 import subagent_stop
 
 
-def get_assistant_line(message_id, input_tokens):
+def get_assistant_line(message_id, input_tokens, model="model-a"):
     message = {
         "role": "assistant",
         "id": message_id,
-        "model": "model-a",
+        "model": model,
         "usage": {
             "input_tokens": input_tokens,
             "output_tokens": input_tokens * 2,
@@ -155,6 +155,81 @@ class SubagentStopTokens(unittest.TestCase):
 
         self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(3))
         self.assertEqual(self.get_counted_usage_files(), [])
+
+
+POST_TOOL_EVENTS_WITH_OTHER_MODEL = [
+    {"phase": "post_tool", "tool_use_id": "toolu_1", "model": "model-x", "_epoch": 1.0},
+]
+
+
+class SubagentArtifactModel(unittest.TestCase):
+    def setUp(self):
+        transcript_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(transcript_dir.cleanup)
+        self.transcript_path = Path(transcript_dir.name) / "agent-transcript.jsonl"
+
+    def write_transcript(self, lines):
+        self.transcript_path.write_text("".join(lines), encoding="utf-8")
+
+    def build_artifact_of_transcript(self, transcript_path, previously_counted_usage=None):
+        payload = {"session_id": "session-a", "agent_id": "agent-1", "agent_type": "example-agent"}
+        return subagent_stop.build_artifact(
+            POST_TOOL_EVENTS_WITH_OTHER_MODEL,
+            payload,
+            transcript_path,
+            None,
+            previously_counted_usage=previously_counted_usage,
+        )
+
+    def test_model_is_the_transcripts_dominant_model_not_the_post_tool_model(self):
+        self.write_transcript([
+            get_assistant_line("msg_1", 10, model="model-a"),
+            get_assistant_line("msg_2", 10, model="model-b"),
+            get_assistant_line("msg_3", 10, model="model-b"),
+        ])
+
+        artifact = self.build_artifact_of_transcript(str(self.transcript_path))
+
+        self.assertEqual(artifact["model"], "model-b")
+
+    def test_model_is_null_without_a_transcript_path(self):
+        artifact = self.build_artifact_of_transcript(None)
+
+        self.assertIsNone(artifact["model"])
+
+    def test_model_is_null_when_the_transcript_yields_no_usage(self):
+        self.write_transcript([])
+
+        artifact = self.build_artifact_of_transcript(str(self.transcript_path))
+
+        self.assertIsNone(artifact["model"])
+
+    def test_model_is_null_when_no_transcript_message_names_a_model(self):
+        self.write_transcript([get_assistant_line("msg_1", 10, model=None)])
+
+        artifact = self.build_artifact_of_transcript(str(self.transcript_path))
+
+        self.assertIsNone(artifact["model"])
+
+    def test_later_artifact_of_agent_carries_the_whole_transcripts_dominant_model(self):
+        self.write_transcript([
+            get_assistant_line("msg_1", 10, model="model-a"),
+            get_assistant_line("msg_2", 10, model="model-a"),
+            get_assistant_line("msg_3", 10, model="model-b"),
+        ])
+        usage_counted_by_earlier_artifact = {
+            "input_tokens": 20,
+            "output_tokens": 40,
+            "cache_read_input_tokens": 60,
+            "cache_creation_input_tokens": 80,
+        }
+
+        artifact = self.build_artifact_of_transcript(
+            str(self.transcript_path),
+            previously_counted_usage=usage_counted_by_earlier_artifact,
+        )
+
+        self.assertEqual(artifact["model"], "model-a")
 
 
 if __name__ == "__main__":
