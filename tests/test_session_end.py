@@ -11,8 +11,8 @@ import _common
 import session_end
 
 
-def get_pre_tool(tool_use_id, tool_name="Bash"):
-    return {"phase": "pre_tool", "tool_use_id": tool_use_id, "tool_name": tool_name, "_epoch": 10.0}
+def get_pre_tool(tool_use_id):
+    return {"phase": "pre_tool", "tool_use_id": tool_use_id, "tool_name": "Bash", "_epoch": 10.0}
 
 
 def get_post_tool(tool_use_id, is_error=False):
@@ -83,15 +83,15 @@ class RollupRedFlags(unittest.TestCase):
             "phase": "red_flag",
             "kind": "permission_denied",
             "inferred_from": "is_error_signature",
-            "tool_name": "Read",
+            "tool_name": "Bash",
             "tool_use_id": "toolu_1",
         }
-        events = [get_pre_tool("toolu_1", tool_name="Read"), get_post_tool("toolu_1"), persisted_flag]
+        events = [get_pre_tool("toolu_1"), get_post_tool("toolu_1"), persisted_flag]
 
         counts = get_red_flag_counts(events)
 
         self.assertEqual(counts["permission_denied_count"], 1)
-        self.assertEqual(counts["permission_denied_tools"], {"Read": 1})
+        self.assertEqual(counts["permission_denied_tools"], {"Bash": 1})
 
     def test_red_flag_count_sums_derived_and_persisted_flags(self):
         persisted_flag = {"phase": "red_flag", "kind": "post_edit_check", "tool_use_id": "toolu_2"}
