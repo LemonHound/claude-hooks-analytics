@@ -218,6 +218,14 @@ class ContextTokens(unittest.TestCase):
 
         self.assertEqual(turn["final_input_tokens"], 310)
 
+    def test_turn_context_size_counts_non_int_usage_field_as_zero(self):
+        usage = {"input_tokens": 5, "cache_read_input_tokens": "100", "cache_creation_input_tokens": 7}
+        self.write_transcript([get_assistant_line(usage)])
+
+        turn = self.build_single_turn_of_transcript()
+
+        self.assertEqual(turn["final_input_tokens"], 12)
+
 
 if __name__ == "__main__":
     unittest.main()
