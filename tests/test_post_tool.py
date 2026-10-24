@@ -44,8 +44,8 @@ def read_events_written_by_main(payload):
 
 
 class FailurePayload(unittest.TestCase):
-    def test_failure_payload_produces_post_tool_event_marked_as_error(self):
-        payload = get_failure_payload()
+    def test_failure_event_name_alone_marks_the_post_tool_event_as_error(self):
+        payload = get_failure_payload(error=None)
 
         event = post_tool.build_event(payload)
 
@@ -98,6 +98,17 @@ class FailurePayload(unittest.TestCase):
         event = post_tool.build_event(payload)
 
         self.assertEqual(event["test"], {"test_passed": 3, "test_failed": 2, "test_outcome": "failed"})
+
+    def test_failed_bash_test_command_without_failed_count_has_failed_outcome(self):
+        payload = get_failure_payload(
+            tool_name="Bash",
+            tool_input={"command": "python -m pytest -q"},
+            error="Exit code 1\n3 passed in 0.10s",
+        )
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 3, "test_failed": None, "test_outcome": "failed"})
 
     def test_failed_powershell_test_command_reads_test_result_from_error_text(self):
         payload = get_failure_payload(
