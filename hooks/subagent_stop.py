@@ -140,7 +140,9 @@ def build_artifact(
         cache_creation = sum((e.get("cache_creation_tokens") or 0) for e in post_events)
 
     error_count = sum(1 for e in post_events if e.get("is_error"))
-    model = _dominant_model(post_events)
+    model = None
+    if transcript_usage:
+        model = transcript_usage["dominant_model"]
 
     files_read = sorted({
         (e.get("tool_input_summary") or {}).get("file_path")
@@ -273,15 +275,6 @@ def _first_task_description(events):
         if e.get("tool_name") in ("Agent", "Task") and e.get("task_description"):
             return e["task_description"]
     return None
-
-
-def _dominant_model(post_events):
-    counts = {}
-    for e in post_events:
-        m = e.get("model")
-        if m:
-            counts[m] = counts.get(m, 0) + 1
-    return max(counts, key=counts.get) if counts else None
 
 
 def _breakdown(events):
