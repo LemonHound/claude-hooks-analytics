@@ -206,6 +206,47 @@ class SuccessfulShellTestOutput(unittest.TestCase):
         self.assertEqual(event["test"], {"test_passed": None, "test_failed": None, "test_outcome": "unknown"})
 
 
+def get_successful_read_payload():
+    return {
+        "session_id": "session-a",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "tool_input": {"file_path": "/example/notes.txt"},
+        "tool_use_id": "toolu_example_4",
+        "tool_response": {"content": "example"},
+    }
+
+
+class CallingAgent(unittest.TestCase):
+    def test_records_payload_agent_id_and_agent_type_as_calling_agent(self):
+        payload = get_successful_read_payload()
+        payload["agent_id"] = "agent-1"
+        payload["agent_type"] = "outer-agent"
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["calling_agent_id"], "agent-1")
+        self.assertEqual(event["calling_agent_type"], "outer-agent")
+
+    def test_calling_agent_is_null_when_payload_lacks_agent_fields(self):
+        payload = get_successful_read_payload()
+
+        event = post_tool.build_event(payload)
+
+        self.assertIsNone(event["calling_agent_id"])
+        self.assertIsNone(event["calling_agent_type"])
+
+    def test_failure_event_records_calling_agent(self):
+        payload = get_failure_payload()
+        payload["agent_id"] = "agent-1"
+        payload["agent_type"] = "outer-agent"
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["calling_agent_id"], "agent-1")
+        self.assertEqual(event["calling_agent_type"], "outer-agent")
+
+
 class NoRedFlags(unittest.TestCase):
     def test_failure_reading_like_permission_denial_writes_no_red_flag(self):
         payload = get_failure_payload(error="Permission denied by user")
