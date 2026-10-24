@@ -54,6 +54,8 @@ def build_event(payload: dict, now_fn: Callable[[], str] = now_iso) -> dict:
         "session_id": session_id,
         "tool_use_id": tool_use_id,
         "tool_name": tool_name,
+        "calling_agent_id": payload.get("agent_id"),
+        "calling_agent_type": payload.get("agent_type"),
         "model": model,
         "tool_input_summary": _summarize_input(tool_name, tool_input),
         "cwd": payload.get("cwd"),

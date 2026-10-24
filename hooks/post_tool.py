@@ -224,6 +224,8 @@ def build_event(
         "session_id": session_id,
         "tool_use_id": tool_use_id,
         "tool_name": tool_name,
+        "calling_agent_id": payload.get("agent_id"),
+        "calling_agent_type": payload.get("agent_type"),
         "started_session_id": started_session_id,
         "proposed_task_id": proposed_task_id,
         "model": model,
