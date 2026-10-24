@@ -120,6 +120,21 @@ def write_subagent_watermark(session_id: str, epoch: float) -> None:
     path.write_text(str(epoch), encoding="utf-8")
 
 
+def read_subagent_counted_usage(session_id: str, agent_id: str) -> dict | None:
+    path = EVENTS_DIR / f"{session_id}_{agent_id}_usage.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def write_subagent_counted_usage(session_id: str, agent_id: str, counted_usage: dict) -> None:
+    path = EVENTS_DIR / f"{session_id}_{agent_id}_usage.json"
+    path.write_text(json.dumps(counted_usage), encoding="utf-8")
+
+
 def write_artifact(artifact):
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     task_id = artifact.get("task_id") or "notask"
