@@ -31,7 +31,7 @@ def read_usage_of_transcript(lines):
         return _transcript.read_transcript_usage(transcript_path)
 
 
-def get_token_sums(input_tokens):
+def get_expected_token_sums(input_tokens):
     return {
         "input_tokens": input_tokens,
         "output_tokens": input_tokens * 2,
@@ -55,35 +55,35 @@ class ReadTranscriptUsage(unittest.TestCase):
 
         usage = read_usage_of_transcript(lines)
 
-        self.assertEqual(get_token_sums_of_usage(usage), get_token_sums(10))
+        self.assertEqual(get_token_sums_of_usage(usage), get_expected_token_sums(10))
 
     def test_counts_first_non_zero_line_of_message_id_when_first_line_has_zero_usage(self):
         lines = [get_assistant_line("msg_1", 0), get_assistant_line("msg_1", 7), get_assistant_line("msg_1", 9)]
 
         usage = read_usage_of_transcript(lines)
 
-        self.assertEqual(get_token_sums_of_usage(usage), get_token_sums(7))
+        self.assertEqual(get_token_sums_of_usage(usage), get_expected_token_sums(7))
 
     def test_counts_each_line_without_message_id(self):
         lines = [get_assistant_line(None, 10), get_assistant_line(None, 10)]
 
         usage = read_usage_of_transcript(lines)
 
-        self.assertEqual(get_token_sums_of_usage(usage), get_token_sums(20))
+        self.assertEqual(get_token_sums_of_usage(usage), get_expected_token_sums(20))
 
     def test_counts_each_line_with_empty_message_id(self):
         lines = [get_assistant_line("", 10), get_assistant_line("", 10)]
 
         usage = read_usage_of_transcript(lines)
 
-        self.assertEqual(get_token_sums_of_usage(usage), get_token_sums(20))
+        self.assertEqual(get_token_sums_of_usage(usage), get_expected_token_sums(20))
 
     def test_counts_messages_with_different_ids_once_each(self):
         lines = [get_assistant_line("msg_1", 10), get_assistant_line("msg_2", 5), get_assistant_line("msg_2", 5)]
 
         usage = read_usage_of_transcript(lines)
 
-        self.assertEqual(get_token_sums_of_usage(usage), get_token_sums(15))
+        self.assertEqual(get_token_sums_of_usage(usage), get_expected_token_sums(15))
 
     def test_dominant_model_counts_every_line_with_usage(self):
         lines = [

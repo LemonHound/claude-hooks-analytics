@@ -26,7 +26,7 @@ def get_assistant_line(message_id, input_tokens):
     return json.dumps({"message": message}) + "\n"
 
 
-def get_artifact_tokens(input_tokens):
+def get_expected_artifact_tokens(input_tokens):
     return {
         "input_tokens": input_tokens,
         "output_tokens": input_tokens * 2,
@@ -91,7 +91,7 @@ class SubagentStopTokens(unittest.TestCase):
 
         artifact = self.run_stop_and_take_artifact("agent-1")
 
-        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(10))
+        self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(10))
 
     def test_later_artifact_of_agent_carries_only_usage_of_new_messages(self):
         self.append_transcript_lines([get_assistant_line("msg_1", 10)])
@@ -100,7 +100,7 @@ class SubagentStopTokens(unittest.TestCase):
 
         artifact = self.run_stop_and_take_artifact("agent-1")
 
-        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(7))
+        self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(7))
 
     def test_third_artifact_of_agent_carries_only_usage_of_messages_added_since_second(self):
         self.append_transcript_lines([get_assistant_line("msg_1", 10)])
@@ -111,7 +111,7 @@ class SubagentStopTokens(unittest.TestCase):
 
         artifact = self.run_stop_and_take_artifact("agent-1")
 
-        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(5))
+        self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(5))
 
     def test_later_artifact_of_agent_without_new_messages_carries_zero_tokens(self):
         self.append_transcript_lines([get_assistant_line("msg_1", 10)])
@@ -119,7 +119,7 @@ class SubagentStopTokens(unittest.TestCase):
 
         artifact = self.run_stop_and_take_artifact("agent-1")
 
-        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(0))
+        self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(0))
 
     def test_artifact_is_not_reduced_by_usage_counted_for_another_agent(self):
         self.append_transcript_lines([get_assistant_line("msg_1", 10)])
@@ -127,7 +127,7 @@ class SubagentStopTokens(unittest.TestCase):
 
         artifact = self.run_stop_and_take_artifact("agent-2")
 
-        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(10))
+        self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(10))
 
     def test_artifacts_without_agent_id_carry_full_total_and_write_no_counted_usage(self):
         self.append_transcript_lines([get_assistant_line("msg_1", 10)])
@@ -135,7 +135,7 @@ class SubagentStopTokens(unittest.TestCase):
 
         artifact = self.run_stop_and_take_artifact(None)
 
-        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(10))
+        self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(10))
         self.assertEqual(self.get_counted_usage_files(), [])
 
     def test_artifact_without_transcript_usage_uses_post_tool_sums_and_writes_no_counted_usage(self):
@@ -153,7 +153,7 @@ class SubagentStopTokens(unittest.TestCase):
 
         artifact = self.run_stop_and_take_artifact("agent-1")
 
-        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(3))
+        self.assertEqual(get_tokens_of_artifact(artifact), get_expected_artifact_tokens(3))
         self.assertEqual(self.get_counted_usage_files(), [])
 
 
