@@ -42,6 +42,13 @@ class WriteArtifact(unittest.TestCase):
 
         self.assertEqual(filename, "Example-Task_pr-review-toolkit_code-reviewer_20261023T233533.json")
 
+    def test_spaces_slashes_and_non_ascii_letters_in_agent_become_underscores(self):
+        artifact = get_artifact(agent="a b/c\\dé")
+
+        filename = self.write_and_get_filename_without_date(artifact)
+
+        self.assertEqual(filename, "Example-Task_a_b_c_d__20261023T233533.json")
+
     def test_path_and_reserved_characters_in_task_id_become_underscores(self):
         artifact = get_artifact(task_id='a b/c\\d<e>f:g"h|i?j*k\x01l')
 
