@@ -184,6 +184,20 @@ class SuccessfulShellTestOutput(unittest.TestCase):
 
         self.assertEqual(event["test"], {"test_passed": 5, "test_failed": None, "test_outcome": "passed"})
 
+    def test_missing_stderr_counts_as_empty(self):
+        payload = get_successful_test_command_payload({"stdout": "3 passed"})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 3, "test_failed": None, "test_outcome": "passed"})
+
+    def test_non_string_stderr_counts_as_empty(self):
+        payload = get_successful_test_command_payload({"stdout": "3 passed", "stderr": None})
+
+        event = post_tool.build_event(payload)
+
+        self.assertEqual(event["test"], {"test_passed": 3, "test_failed": None, "test_outcome": "passed"})
+
     def test_test_summary_only_in_content_is_not_read(self):
         payload = get_successful_test_command_payload({"content": "5 passed", "stdout": "", "stderr": ""})
 
