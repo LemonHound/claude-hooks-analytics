@@ -24,6 +24,21 @@ def get_assistant_line(message_id, input_tokens, model="model-a"):
     return json.dumps({"message": message})
 
 
+def get_assistant_line_with_output_tokens(message_id, output_tokens):
+    message = {
+        "role": "assistant",
+        "id": message_id,
+        "model": "model-a",
+        "usage": {
+            "input_tokens": 10,
+            "output_tokens": output_tokens,
+            "cache_read_input_tokens": 30,
+            "cache_creation_input_tokens": 40,
+        },
+    }
+    return json.dumps({"message": message})
+
+
 def read_usage_of_transcript(lines):
     with tempfile.TemporaryDirectory() as transcript_dir:
         transcript_path = Path(transcript_dir) / "transcript.jsonl"
@@ -57,8 +72,25 @@ class ReadTranscriptUsage(unittest.TestCase):
 
         self.assertEqual(get_token_sums_of_usage(usage), get_expected_token_sums(10))
 
-    def test_counts_first_non_zero_line_of_message_id_when_first_line_has_zero_usage(self):
-        lines = [get_assistant_line("msg_1", 0), get_assistant_line("msg_1", 7), get_assistant_line("msg_1", 9)]
+    def test_counts_last_line_of_message_id_when_output_tokens_grow_across_lines(self):
+        lines = [
+            get_assistant_line_with_output_tokens("msg_1", 1),
+            get_assistant_line_with_output_tokens("msg_1", 5),
+            get_assistant_line_with_output_tokens("msg_1", 9),
+        ]
+
+        usage = read_usage_of_transcript(lines)
+
+        expected_token_sums = {
+            "input_tokens": 10,
+            "output_tokens": 9,
+            "cache_read_input_tokens": 30,
+            "cache_creation_input_tokens": 40,
+        }
+        self.assertEqual(get_token_sums_of_usage(usage), expected_token_sums)
+
+    def test_zero_usage_line_does_not_replace_earlier_usage_of_message_id(self):
+        lines = [get_assistant_line("msg_1", 7), get_assistant_line("msg_1", 0)]
 
         usage = read_usage_of_transcript(lines)
 
