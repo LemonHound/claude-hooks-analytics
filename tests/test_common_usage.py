@@ -43,6 +43,13 @@ class SubagentCountedUsage(unittest.TestCase):
 
         self.assertIsNone(counted_usage)
 
+    def test_does_not_return_counted_usage_of_the_same_agent_in_another_session(self):
+        _common.write_subagent_counted_usage("session-a", "agent-1", COUNTED_USAGE)
+
+        counted_usage = _common.read_subagent_counted_usage("session-b", "agent-1")
+
+        self.assertIsNone(counted_usage)
+
 
 if __name__ == "__main__":
     unittest.main()

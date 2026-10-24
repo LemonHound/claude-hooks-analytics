@@ -102,6 +102,17 @@ class SubagentStopTokens(unittest.TestCase):
 
         self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(7))
 
+    def test_third_artifact_of_agent_carries_only_usage_of_messages_added_since_second(self):
+        self.append_transcript_lines([get_assistant_line("msg_1", 10)])
+        self.run_stop_and_take_artifact("agent-1")
+        self.append_transcript_lines([get_assistant_line("msg_2", 7)])
+        self.run_stop_and_take_artifact("agent-1")
+        self.append_transcript_lines([get_assistant_line("msg_3", 5)])
+
+        artifact = self.run_stop_and_take_artifact("agent-1")
+
+        self.assertEqual(get_tokens_of_artifact(artifact), get_artifact_tokens(5))
+
     def test_later_artifact_of_agent_without_new_messages_carries_zero_tokens(self):
         self.append_transcript_lines([get_assistant_line("msg_1", 10)])
         self.run_stop_and_take_artifact("agent-1")
